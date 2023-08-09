@@ -1,0 +1,232 @@
+---
+title: "Soay-Sheep"
+author: '2228819'
+date: "2023-08-06"
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+
+library(vroom)
+library("dplyr")
+library(readr)
+library(ggplot2)
+
+knitr::opts_chunk$set(echo =TRUE)
+
+```
+
+## Read in the data
+
+The provided data sets is read into the project by using "vroom package" to read the data from the file path.
+
+However, the data were not in a data frame, hence the use of "col_type" argument to specify the variables to the right column. The argument takes the cols() method and each parameter is set to the correct data type.
+
+
+```{r NAO and Mass data} 
+#Read the NAO data 
+NAO_data1 <- vroom("C:\\Users\\kv22535\\Downloads\\NAO_kv22535-1.tsv.gz", delim = "\t", 
+                     col_types = cols(
+                     month = col_character(),
+                     year = col_double(),
+                     NAO = col_double()
+                   ))
+mass_data1 <- vroom("C:\\Users\\kv22535\\Downloads\\mass_kv22535-1.tsv.gz", delim = "\t", 
+                     col_types = cols(
+                     year = col_double(),
+                     ID = col_double(),
+                     age = col_double(),
+                     sex = col_character(),
+                     n_babies = col_double(),
+                     observer = col_double(),
+                     pop_size = col_double(),
+                     weight = col_double()
+                   ))
+  
+# Print the column specification
+View(NAO_data1)
+View(mass_data1)
+```
+
+
+## Data tiding 
+
+### NAO data
+
+The NAO data is represented by three (3) columns, each represent: year, month and NAO. 
+
+### Mass data
+
+The mass data frame contain eight(8) columns. However, the "weight" column contains some invalid data (NA), to remove this, the filter() function is used to remove the "NA" values specifically from the "weight" column.
+
+### Merging the NAO and Mass data
+
+To enhance the analysis and give better context to the data set, the NAO and mass data frame are merged together using the merge() method. The common value used for merging is "year".
+
+```{r data manipulation and tidying}
+
+
+# Filter out NA values from NA weight column
+filtered_massdata <- mass_data1 %>% filter(!is.na(weight))
+View(filtered_massdata)
+
+#Merge by year
+merged_data <- merge(filtered_massdata, NAO_data1, by = "year")
+View(merged_data)
+
+```
+
+## Data visualization
+
+To analyse the data in relation to the weight, a geom_boxplot() is used for visualization. The ggplot() function sets up the base plot with the merged_data as the data source and defines the aesthetics (aes) mapping for the plot. From the visualization, the line inside the box represents the median weight, data points beyond the whiskers are considered potential outliers and are plotted as individual points.
+
+
+### 1. n_babies & sex/weight
+
+By comparing the boxplots for different categories of n_babies with corresponding colors for male and female, it is observed that the weight of female Soay Sheep is higher than male sheep.
+ 
+```{r  fig.cap = "n_babies against weight." }
+
+ggplot(merged_data, aes(x = factor(n_babies), y = weight, fill = sex)) +
+  geom_boxplot() +
+  labs(title = "Weight distribution by Sex and Number of Babies",
+       x = "Number of Babies",
+       y = "Weight") +
+  #theme_minimal(): Reduces background elements and gridlines to keep the focus on the data.
+#scale_fill_discrete(): It sets the legend title to "sex" to indicate that the colors in the plot represent different sex(male , female)).
+  scale_fill_discrete(name = "Sex") +
+  theme_minimal()
+
+
+```
+
+
+### 2. age/weight 
+
+By comparing the boxplots for different age categories, It is observed each box appears progressively higher as the age increases, this indicates that the weight is higher in consecutive age category, showing clear variance. 
+
+```{r fig.cap = "age against weight."}
+
+#theme_minimal(): Reduces background elements and gridlines to keep the focus on the data.
+#scale_fill_discrete(): It sets the legend title to "age" to indicate that the colors in the plot represent different age grade).
+
+ggplot(merged_data, aes(x = factor(age), y = weight, color = age)) +
+  geom_boxplot() +
+  labs(title = "Weight distribution by age",
+       x = "age",
+       y = "Weight") +
+  scale_fill_discrete(name = "age") +
+  theme_minimal()
+
+```
+
+### 3. NAO/weight 
+
+The histogram below shows the distribution of NAO values in respect to the weight. It is observed that The variance in the data is not well explained by the predictor variables (NAO), this might be because the NAO data is observed to have a wide range of values that are not appropriately scaled for visualization. However, the weight of the Soay Sheep appeared to increase in most summer period. 
+
+```{r fig.cap = "NAO against weight."}
+
+#geom_histogram() is used to create the histogram and set the bin width to 0.2 to control the width of the bins. 
+#theme_minimal(): Reduces background elements and gridlines to keep the focus on the data.
+
+ggplot(merged_data, aes(x = NAO, fill = factor(month))) +
+  geom_histogram(binwidth = 0.2, color = "white")  +
+  labs(title = "Histogram: North Atlantic Oscillation (NAO)",
+       x = "NAO",
+       y = "weight") +
+  theme_minimal()
+```
+
+
+## Generalized linear model(GLM)
+
+```{r generalized linear model}
+
+#The response variable from the analysis is "weight". While we have visualized "NAO", "Sex", "n_babies" and "age" as a predictor variable.
+
+```
+
+
+A statistic modelling is performed to establish strength and clear relationship that exist between the predictor variable and response variables. 
+
+In this project, GLM is selected for statistical modeling because it is best to capture continuous response variable such as "weight". Also, it is good for checking linear relationship between variables. Since the response variable is continuous, the "Gaussian" distribution is used for this model. 
+
+
+### Model 1 
+
+This model shows that each one-unit increase in age, the weight of Soay sheep increases by approximately 0.492 units. The low residual deviance (93770: lower than the null deviance) and AIC (229100) suggest that the model fits the data relatively well, and the age variable has a significant effect on the weight of the sheep.
+
+```{r model 1}
+
+mod1_1 <- glm(weight ~ age,
+            ##specify the data
+            data = merged_data,
+            ##specify the error structure
+            family = "gaussian")
+mod1_1
+
+```
+
+
+### Model 2
+
+The result of this model shows that each one-unit increase in (NAO) index, the weight of Soay sheep increases by approximately 0.04568 units, assuming all other variables are constant. The residual deviance (376100: lower than the null deviance) and AIC (333000) indicate that the model provides an acceptable fit to the data, and the NAO variable has a significant effect on the weight of the sheep.
+
+```{r model 2}
+
+mod2_2 <- glm(weight ~ NAO,
+              data = merged_data,
+              family = "gaussian")
+
+mod2_2
+
+```
+
+
+## Module 3
+
+This linear regression model indicates that, on average, each additional baby decreases the weight of a female Soay sheep by approximately 0.06291 units, and male Soay sheep weigh approximately 1.45098 units less than females, assuming all other variables are constant.
+
+```{r model three}
+
+
+mod3_3 <- glm(weight ~ n_babies + sex,
+              data = merged_data,
+              family = "gaussian")
+
+(mod3_3)
+```
+
+
+## Compare the models
+
+The models are compared using anova() method. In the below table, Model 3 has a very low p-value (< 2.2e-16), indicating that the improvement in fit compared to Model 2 and 1 is highly significant. Also, Model 2 improved the fit by -282320 units compared to Model 1. Similarly, Model 3 improved the fit by 39266 units compared to Model 2.
+
+```{r }
+
+# comparing deviance of models by order of ranking.
+anova(mod1_1, mod2_2, mod3_3, test = "Chisq")
+
+```
+
+
+## Determinant of the mass of Soay sheep
+
+The variable that best determines the mass of Soay sheep is "n_babies". It has a significant effect on the weight of the Sheep. The coefficient obtained from model-3, indicates that for each additional baby a female Soay sheep has, the average weight decreases by approximately 0.06291 units. This suggests that Soay Sheep with more babies tend to have lower weights compared to those with fewer or no babies.
+
+
+
+## Model performance
+
+check_model() is used to check the performance of the preffered model(model 3). The Posterior predictive check doesn't show wide discrepancy, the Linearity shows a flat horizontal line and the residual dots are well arranged, indicates a significant linear relationship between the predictor variables and the outcome.
+
+```{r performance}
+
+library("performance")
+
+check_model(mod3_3)
+
+
+```
+
